@@ -1,0 +1,865 @@
+---
+title: "ETHEREUM PROJECT - BAT TOKEN"
+author: "Praveen Ramani, <br/> Pawan Dasharath Patil, <br/> Navaneetha Krishnan Muralidaran"
+date: "30 November 2018"
+output: word_document
+---
+
+#ETHEREUM
+* Ethereum is an open-source, public, blockchain-based distributed computing platform and operating system featuring smart contract (scripting) functionality.(https://en.wikipedia.org/wiki/Ethereum)<br/>
+* It enables applications (DAPPs) to be built on blockchain technology.<br/>
+* Blockchain is used to determine the ownership of an item without using a third-party.<br/>
+* The data is stored in a distributed ledger which provides consensus without a central authority.<br/>
+
+##Ether
+Ether is the cryptocurrency that runs on the ethereum platform. To run applications or view resources on the ethereum platform, a certain amount of fees should be paid. The payment is done using "gas" which is a subunit of ether. Ether can also be transferred to other individuals.<br/>
+
+#ETC-20
+* ERC stands for Ethereum Request for Comment and this request is assigned the number 20.<br/>
+* It defines a set of rules that an Ethereum token must follow.<br/>
+* These rules define how the token data can be viewed and how tokens can be tranferred.<br/>
+
+#Tokens
+ Ethereum tokens are used to represent digital assets on the ethereum platform.<br/>
+
+##Two Types
+###Useage Tokens
+These act like currency for their corresponding DAPP. e.g Golem<br/>
+
+###Work Tokens
+These act like stocks of the DAPP.<br/>
+
+#Primary Token
+The primary token of our project is networkbatTX.<br/>
+
+#BAT
+* BAT stands for Basic Attention Token.<br/>
+* This token is used to obtain advertising services.<br/>
+* The publisher of an advertisement gets paid in BATs based on the amount of user attention it gets.<br/>
+
+#Primary goal
+ The primary goal of this project is to<br/>
+1. find the distribution of how many times a user buys and sells the token.<br/>
+2. form layers on the number of transactions and find the correlation between the number of transactions and price of the token, for each layer.<br/>
+3. track the activity the most active buyers and sellers of BAT in other tokens.<br/>
+
+##Eliminating Outliers of BatchOverflow Vulnerability 
+* Batchoverflow vulnerability enabled hackers to create counterfeit tokens by causing an integer overflow.<br/>
+* Therefore, we should eliminate such transactions from the token data.
+* Total supply: 1.5e+9
+* Digits: e+18
+* Therefore, we must eliminate transactions with amounts more than 1.5e+27
+Total number of records were 327854 and after eliminating 6 outliers we have total of 327848 records.
+
+#Question 1 <br/>
+```{r include=FALSE}
+#Importing data from file "networkbatTX.txt"
+data<-read.table("networkbatTX.txt",header=FALSE,sep=" ")
+nrow(data)    #Finding the number of records
+```
+
+```{r include=FALSE}
+ #removing outliers
+#The token has e+18 digits and there are a total of 1.5e+9 tokens.Therefore we #eliminate the values greater than 1.5e+27
+cleandata<- subset(data,V4<=1.5e+27)  
+summary(cleandata) 
+nrow(cleandata) #Finding the number of records for cleaned data
+```
+##Buyer Data
+<br/>We have taken the number of buys and their frequencies.<br/>
+```{r include=FALSE}
+buydata<-cleandata[c(2,4)] # selecting buyers column(toNodeID) and Toke amounts from cleaned data
+summary(buydata)
+```
+```{r include=FALSE}
+buyer<-buydata[c(1)] # selecting buyers column(toNodeID) 
+```
+```{r include=FALSE}
+library(plyr)
+buyerfreq <- count(buyer,c("V2")) # Count function is used to get the buyer frequency 
+freq<-subset(buyerfreq,select=c("freq"))
+```
+```{r include=FALSE}
+res<-as.data.frame(table(freq)) # converting to frame
+plot(res, main = "Frequency of buys for the token", xlab= "Number of buys", ylab= "Frequency",cex.main=0.5)
+```
+```{r include=FALSE}
+#install.packages("fitdistrplus")
+library(fitdistrplus)
+```
+
+###Estimating as a discrete distribution.
+```{r echo=FALSE}
+descdist(res$Freq, discrete = TRUE) 
+```
+<br>On observation from the Cullen and Frey Graph the distribution is closer to poisson distribution than negative binomial distribution.<br/>
+
+###Fitting with Poisson distribution.
+```{r echo=FALSE}
+fit.poi <- fitdist(res$Freq,distr = "pois") 
+plot(fit.poi) 
+```
+
+###Fitting with Negative binomial distribution.
+```{r echo=FALSE}
+fit.nbi <- fitdist(res$Freq,distr = "nbinom",method = "mle") 
+plot(fit.nbi)
+```
+
+<br/>Comparing the Emp. and theo. CDFs graphs of the two distributions, we can say that the dataset fits better with poisson distribution when compared to negative binomial distribution.<br/>
+
+
+##Seller data
+<br/>We have taken the number of sells and their frequencies.<br/>
+```{r include=FALSE}
+selldata<-cleandata[c(1,4)] # selecting sellers column(fromNodeID) and Token amounts from cleaned data
+summary(selldata)
+```
+```{r include=FALSE}
+seller<-selldata[c(1)] # selecting sellers column(fromNodeID) 
+```
+```{r include=FALSE}
+sellerfreq <- count(seller,c("V1")) # Count function is used to get the seller frequency 
+freq1<-subset(sellerfreq,select=c("freq"))
+```
+```{r include=FALSE}
+res1<-as.data.frame(table(freq1)) # converting to frame
+plot(res1, main = "Frequency of sells for the token", xlab= "Number of sells", ylab= "Frequency", cex.main=0.75)
+```
+
+###Estimating as a discrete distribution<br/>.
+```{r echo=FALSE}
+#estimating as a discrete distribution
+descdist(res1$Freq, discrete = TRUE) 
+```
+
+<br>The observation is found to be closer to poisson distribution than negative binomial distribution<br/>
+
+###Fitting with poisson distribution<br/>
+```{r echo=FALSE}
+fit.poi <- fitdist(res1$Freq,distr = "pois") 
+plot(fit.poi) 
+```
+
+###Fitting with negative binomial  distribution<br/>
+```{r echo=FALSE}
+fit.nbi <- fitdist(res1$Freq,distr = "nbinom",method = "mle") 
+plot(fit.nbi)
+```
+
+Comparing the Emp. and theo. CDFs graphs of the two distributions, we can say that the dataset fits better with poisson distribution when compared to negative binomial distribution.<br/>
+
+
+#Question 2<br/>
+##Layers<br/>
+We create 4 layers based on the quartile values of the 'amount' column.<br/>
+
+###Layer1:
+Date and number of transactions on that day with amounts between min and q1.<br/>
+
+###Layer2:
+Date and number of transactions on that day with amounts between q1 and q2(median).<br/>
+
+###Layer3:
+Date and number of transactions on that day with amounts between q2 and q3.<br/>
+
+###Layer4:
+Date and number of transactions on that day with amounts between q3 and max.<br/>
+
+```{r include=FALSE}
+vari2<-as.data.frame.Date(as.Date(as.POSIXct(cleandata$V3,origin="1970-01-01")))
+nrow(vari2)
+```
+```{r include=FALSE}
+#install.packages("sqldf")
+library("sqldf")
+d<-sqldf("select V3,V4 from cleandata order by V4 desc")
+m<-max(d$V4)
+lay1<-sqldf("select * from d where V4>=0 and V4<5e+19")
+#lay1
+```
+```{r include=FALSE}
+#Importing data from file "networkbatTX.txt"
+data<-read.table("networkbatTX.txt",header=FALSE,sep=" ")
+nrow(data)    #Finding the number of records
+ #removing outliers
+#The token has e+18 digits and there are a total of 1.5e+9 tokens.Therefore we #eliminate the values greater than 1.5e+27
+cleandata<- subset(data,V4<=1.5e+27)  
+summary(cleandata) 
+nrow(cleandata) #Finding the number of records for cleaned data
+```
+```{r include=FALSE}
+#install.packages("sqldf")
+library("sqldf")
+temp_amt<-sqldf("select V4 from cleandata")
+d<-data.frame(as.data.frame.Date(as.Date(as.POSIXct(cleandata$V3,origin="1970-01-01"))),temp_amt)
+#converting unixTime to Date
+colnames(d)<-c("time","amount")
+#d
+nrow(d)
+summary(d)
+```
+```{r include=FALSE}
+lay1<-sqldf("select time,count(amount) as count from d where amount<=1.94e+20 group by time")
+nrow(lay1)
+#tot<-sqldf("select sum(count) from lay1")
+#tot
+```
+```{r include=FALSE}
+lay2<-sqldf("select time,count(amount) as count from d where amount>1.94e+20 and amount<=9.373e+20 group by time")
+nrow(lay2)
+```
+```{r include=FALSE}
+lay3<-sqldf("select time,count(amount) as count from d where amount>9.373e+20 and amount<=4.758e+21 group by time")
+nrow(lay3)
+```
+```{r include=FALSE}
+lay4<-sqldf("select time,count(amount) as count from d where amount>4.758e+21 and amount<=5e+26 group by time")
+nrow(lay4)
+```
+
+```{r include=FALSE}
+plot(lay1, main="selecting layer for values between Minimum and 1st Quartile",cex.main=0.75)
+plot(lay2, main="selecting layer for values more than 1st Quartile and less than or equal to Median",cex.main=0.75)
+plot(lay3, main="selecting layer for values more than Median and less than or equal to 3rd Quartile",cex.main=0.75)
+plot(lay4, main="selecting layer for values more than 3rd Quartile and less than or equal to Maximum",cex.main=0.75)
+```
+
+###Price Values:
+We take the average of high and low values of price from the price graph, as that days's price measure.<br/>
+```{r include=FALSE}
+price_data<-read.table("bat.txt",header=TRUE,sep="\t")
+nrow(price_data)
+avg<-(price_data$High+price_data$Low)/2
+avg1<-as.data.frame(avg)
+modified_price_data<-data.frame(price_data,avg1)
+summary(modified_price_data)
+```
+```{r include=FALSE}
+#install.packages("anytime",repos = "http://cran.us.r-project.org")
+library("anytime")
+```
+
+```{r include =FALSE}
+modified_price_data$Date<-anytime::anydate(modified_price_data$Date)
+```
+```{r include=FALSE}
+plot_data<-sqldf("select Date,avg from modified_price_data")
+#plot(plot_data)
+summary(plot_data)
+plot(plot_data)
+```
+
+
+
+###Correlation values for each layers
+We find the correlation between number of transactions and price for each layer.<br/>
+```{r echo=FALSE}
+cor_lay1<-sqldf("select time,count,avg from modified_price_data, lay1 where Date=time")
+#summary(cor_lay1)
+cor_lay2<-sqldf("select time,count,avg from modified_price_data, lay2 where Date=time")
+cor_lay3<-sqldf("select time,count,avg from modified_price_data, lay3 where Date=time")
+cor_lay4<-sqldf("select time,count,avg from modified_price_data, lay4 where Date=time")
+```
+
+```{r}
+cor(cor_lay1$count,cor_lay1$avg, method = "pearson")
+cor(cor_lay2$count,cor_lay2$avg, method = "pearson")
+cor(cor_lay3$count,cor_lay3$avg, method = "pearson")
+cor(cor_lay4$count,cor_lay4$avg, method = "pearson")
+```
+
+###Correlation for entire Dataset
+```{r echo=FALSE}
+ent<-sqldf("select time,count(amount) as count from d group by time")
+cor_ent<-sqldf("select time,count,avg from modified_price_data,ent where Date=time")
+cor(cor_ent$count,cor_ent$avg, method = "pearson")
+```
+
+<br>The correlation seems to be around 0.5. We can say that this token has a moderate positive correlation.<br/>
+
+#Question 3:
+##For Buyer
+```{r include=FALSE}
+library("sqldf")
+data<-read.table("networkbatTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+
+```
+```{r include=FALSE}
+buyerplot_bat<-sqldf("select * from buyerdat order by freq desc limit 10")
+buyerplot_bat
+
+```
+```{r include=FALSE}
+data<-read.table("networkeosTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer,b.freq as bat, d.freq as eos from buyerplot_bat b left join buyerdat d on b.buyer=d.buyer ")
+```
+```{r include=FALSE}
+data<-read.table("networktronixTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, d.freq as tronix from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkomisegoTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, d.freq as omisego from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkyocoinTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, d.freq as yocoin from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkgolemTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, d.freq as golem from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkmcapTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, d.freq as mcap from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkstatusnetworkTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, d.freq as statusnetwork from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkbeautychain1TX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, d.freq as beautychain1 from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkbeautychain2TX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, d.freq as beautychain2 from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkbnbTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, d.freq as bnb from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networktenxpayTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, d.freq as tenxpay from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkstorjTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, d.freq as storj from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkqtumTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, d.freq as qtum from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkzrxTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,d.freq as zrx from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkverosTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, d.freq as veros from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkvechainTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, d.freq as vechain from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networksaltTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, d.freq as salt from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkcivicTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, b.salt, d.freq as civic from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r include=FALSE}
+data<-read.table("networkloopringTX.txt",header=FALSE,sep=" ")
+buyerdat<-sqldf("select distinct V1 as buyer,count(V1) as freq from data group by V1")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.buyer, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, b.salt, b.civic, d.freq as loopring from ans as b left join buyerdat as d on b.buyer=d.buyer")
+```
+```{r echo=FALSE}
+#plot(ans$buyer,ans$bat,col="red")
+```
+
+###Acc.no of top investors and unique tokens they invest in 
+```{r echo=FALSE}
+
+ans1<-sqldf("select b.buyer,
+           ( CASE WHEN b.bat IS NOT NULL THEN 1 ELSE 0 END ) +
+           ( CASE WHEN b.eos IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.tronix IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.omisego IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.yocoin IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.golem IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.mcap IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.statusnetwork IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.beautychain1 IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.beautychain2 IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.bnb IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.tenxpay IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.storj IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.qtum IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.zrx IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.veros IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.vechain IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.salt IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN loopring IS NOT NULL THEN 1 ELSE 0 END ) as uniq_token_count from  
+ans as b left join buyerdat as d on b.buyer=d.buyer")
+ans1
+```
+###Fitting Distributions 
+###Discrete Distribution
+```{r echo=FALSE}
+#library(fitdistrplus)
+library(fitdistrplus)
+descdist(ans1$uniq_token_count, discrete = TRUE) 
+```
+###Continuous Distribution
+```{r echo=FALSE}
+descdist(ans1$uniq_token_count, discrete = FALSE) 
+maxi=max(ans1$uniq_token_count)
+maxi
+temp=as.vector(ans1$uniq_token_count/maxi)
+fit.ans1beta <- fitdist(temp,distr = "beta",method = "mge")
+plot(fit.ans1beta)
+#summary(fit.ans1beta)
+```
+
+The observation point is no where near any of the discrete distributions and is closer to the beta (continuous) distribution. So we tried to fit the data in beta distribution.<br/>
+
+##For seller 
+```{r include=FALSE}
+
+library("sqldf")
+data<-read.table("networkbatTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+#sellerdat
+```
+```{r include=FALSE}
+sellerplot_bat<-sqldf("select * from sellerdat order by freq desc limit 10")
+sellerplot_bat
+
+```
+```{r include=FALSE}
+data<-read.table("networkeosTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller,b.freq as bat, d.freq as eos from sellerplot_bat b left join sellerdat d on b.seller=d.seller ")
+
+```
+```{r include=FALSE}
+data<-read.table("networktronixTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, d.freq as tronix from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkomisegoTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, d.freq as omisego from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkyocoinTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, d.freq as yocoin from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkgolemTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, d.freq as golem from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkmcapTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, d.freq as mcap from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkstatusnetworkTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, d.freq as statusnetwork from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkbeautychain1TX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, d.freq as beautychain1 from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkbeautychain2TX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, d.freq as beautychain2 from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkbnbTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, d.freq as bnb from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networktenxpayTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, d.freq as tenxpay from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkstorjTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, d.freq as storj from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkqtumTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, d.freq as qtum from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkzrxTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,d.freq as zrx from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkverosTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, d.freq as veros from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkvechainTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, d.freq as vechain from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networksaltTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, d.freq as salt from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkcivicTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, b.salt, d.freq as civic from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+data<-read.table("networkloopringTX.txt",header=FALSE,sep=" ")
+sellerdat<-sqldf("select distinct V2 as seller,count(V2) as freq from data group by V2")
+
+```
+```{r include=FALSE}
+ans<-sqldf("select b.seller, b.bat, b.eos, b.tronix, b.omisego, b.yocoin, b.golem, b.mcap, b.statusnetwork, b.beautychain1, b.beautychain2, b.bnb, b.tenxpay, b.storj, b.qtum,b.zrx, b.veros, b.vechain, b.salt, b.civic, d.freq as loopring from ans as b left join sellerdat as d on b.seller=d.seller")
+
+```
+```{r include=FALSE}
+#plot(ans$seller,ans$bat,col="red")
+```
+
+###Acc.no of top investors and unique tokens they invest in 
+```{r echo=FALSE}
+
+ans1<-sqldf("select b.seller,
+           ( CASE WHEN b.bat IS NOT NULL THEN 1 ELSE 0 END ) +
+           ( CASE WHEN b.eos IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.tronix IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.omisego IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.yocoin IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.golem IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.mcap IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.statusnetwork IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.beautychain1 IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.beautychain2 IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.bnb IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.tenxpay IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.storj IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.qtum IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.zrx IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.veros IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.vechain IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN b.salt IS NOT NULL THEN 1 ELSE 0 END ) +
+( CASE WHEN loopring IS NOT NULL THEN 1 ELSE 0 END ) as uniq_token_count from  
+ans as b left join sellerdat as d on b.seller=d.seller")
+ans1
+
+```
+###Fitting Distributions 
+###Discrete Distribution
+```{r echo=FALSE}
+library(fitdistrplus)
+
+descdist(ans1$uniq_token_count, discrete = TRUE) 
+```
+```{r echo=FALSE}
+descdist(ans1$uniq_token_count, discrete = FALSE) 
+fit.ans1 <- fitdist(ans1$uniq_token_count,distr = "unif")
+plot(fit.ans1)
+maxi=max(ans1$uniq_token_count)
+temp=as.vector(ans1$uniq_token_count/maxi)
+fit.ans1beta <- fitdist(temp,distr = "beta",method = "mge")
+plot(fit.ans1beta)
+#summary(fit.ans1beta)
+```
+
+The observation point is no where near any of the discrete distribution and is closer to the beta and uniform continuous distribution. So we tried to fit the data in both beta and uniform distribution.
+
+Comparing the P-P plots we can see that beta distribution fits the data better than uniform distribution.
+
+#Conclusions
+* The number of transactions people do follows an approximate poisson distribution.
+* BAT has a moderate positive correlation with price.
+* The most active buyers and sellers of BAT are also quite active in other tokens.
+* The number of unique tokens that the most active traders invest in is approximately a beta distribution.
+
+
+#Project 2
+
+```{r include=FALSE}
+data<-read.table("networkbatTX.txt",header=FALSE,sep=" ")
+#nrow(data)
+cleandata<- subset(data,V4<=1.5e+27)  
+#summary(cleandata) 
+#nrow(cleandata)
+
+```
+
+```{r include=FALSE}
+library("sqldf")
+layerdata<-sqldf("select V1 as seller, V2 as buyer, V3 as time, V4 as amount from cleandata where V4>=1.94e+20 and V4<=4.758e+21")
+#nrow(layerdata)
+
+```
+
+```{r include=FALSE}
+library("anytime")
+layerdata$time<-anytime::anydate(layerdata$time)
+layerfreq<-sqldf("select time, count(*) as freq from layerdata group by time")
+#layerfreq
+```
+```{r include=FALSE}
+price_data<-read.table("bat.txt",header=TRUE,sep="\t")
+price_data$Date<-anytime::anydate(price_data$Date)
+avg<-(price_data$High+price_data$Low)/2
+price_data<-data.frame(price_data,avg)
+```
+
+```{r include=FALSE}
+final_data<-sqldf("select Date, freq, avg from layerfreq, price_data where time=Date")
+final_data
+```
+
+```{r include=FALSE}
+freq_diff<-0
+freq_diff[2:340]<-(final_data$freq[2:340]-final_data$freq[1:339])/final_data$freq[1:339]
+freq_diff<-as.data.frame(freq_diff)
+freq_diff
+```
+
+```{r include=FALSE}
+price_diff<-0
+price_diff[2:340]<-(final_data$avg[2:340]-final_data$avg[1:339])/final_data$avg[1:339]
+price_diff<-as.data.frame(price_diff)
+price_diff
+
+```
+
+```{r include=FALSE}
+#final_data
+fin_data<-data.frame(freq_diff$freq_diff[2:339],price_diff$price_diff[3:340])
+colnames(fin_data)<-c("x","y")
+#fin_data
+```
+
+#Candidates
+<b>[1]</b> We have taken the number of transactions of the last 3 days as 3 features, to predict the day's average price.<br/>
+```{r echo=FALSE}
+data2b<-data.frame(final_data$freq[1:337],final_data$freq[2:338],final_data$freq[3:339],final_data$avg[4:340])
+colnames(data2b)<-c("x1","x2","x3","y")
+linearMod <- lm(y ~ x1+x2+x3, data=data2b)  
+summary(linearMod)
+```
+
+<b>[2]</b> We have taken the number of transactions of the past 3 days and the price of the previous day, as 4 features, to predict the day's average price.<br/>
+```{r echo=FALSE}
+data2c<-data.frame(final_data$freq[1:337],final_data$freq[2:338],final_data$freq[3:339],final_data$avg[3:339],final_data$avg[4:340])
+colnames(data2c)<-c("x1","x2","x3","x4","y")
+linearMod <- lm(y ~ x1+x2+x3+x4, data=data2c)  
+summary(linearMod)
+
+```
+The r square value is very high. This is because the correlation between average price of two consecutive days is very high as shown below.<br/>
+
+```{r echo=FALSE}
+cor(final_data$avg[1:339],final_data$avg[2:340])
+```
+
+<b>[3]</b> We have taken the number of transactions of the past 3 days, the percentage change in price and percentage change in number of transactions of the past 2 days, as 5 features, to predict the day's average price.
+```{r echo=FALSE}
+data2d<-data.frame(final_data$freq[1:337],final_data$freq[2:338],final_data$freq[3:339],fin_data$y[2:338],fin_data$x[2:338],final_data$avg[4:340])
+colnames(data2d)<-c("x1","x2","x3","x4","x5","y")
+linearMod <- lm(y ~ x1+x2+x3+x4+x5, data=data2d)  
+summary(linearMod)
+
+```
+
+
+
+```{r include=FALSE}
+freq_diff1<-0
+freq_diff1[2:340]<-(final_data$freq[2:340]-final_data$freq[1:339])
+freq_diff1<-as.data.frame(freq_diff1)
+freq_diff1
+```
+
+```{r include=FALSE}
+price_diff1<-0
+price_diff1[2:340]<-(final_data$avg[2:340]-final_data$avg[1:339])
+price_diff1<-as.data.frame(price_diff1)
+price_diff1
+
+```
+```{r include=FALSE}
+fin_data1<-data.frame(freq_diff1$freq_diff1[2:339],price_diff1$price_diff1[3:340])
+colnames(fin_data1)<-c("x","y")
+#fin_data1
+
+```
+
+<b>[4]</b> We have taken the number of transactions of the past 3 days, difference in price and difference in the number of transactions of the past 2 days, as 5 features, to predict the day's average price.
+```{r echo=FALSE}
+data2da<-data.frame(final_data$freq[1:337],final_data$freq[2:338],final_data$freq[3:339],fin_data1$x[2:338],fin_data1$y[2:338],final_data$avg[4:340])
+colnames(data2da)<-c("x1","x2","x3","x4","x5","y")
+linearMod <- lm(y ~ x1+x2+x3+x4+x5, data=data2da)  
+summary(linearMod)
+
+```
+
+#Comparison
+Comparing the r square value of the 4 candidates, the best adjusted r square value is 0.3119 and is got from [4].
+
+#Residuals For [4]
+```{r}
+plot(density(resid(linearMod)))
+qqnorm(resid(linearMod)) 
+qqline(resid(linearMod))
+```
+
+#References
+
+[1] http://r-statistics.co/Linear-Regression.html <br/>
+
+[2] https://stats.stackexchange.com/questions/53254/how-to-find-residuals-and-plot-them <br/>
+
+[3] https://www.r-bloggers.com/make-r-speak-sql-with-sqldf/  <br/>
+
+[4] https://stats.stackexchange.com/questions/236118/fitting-distribution-for-data-in-r <br/>
+
+#Full Project
+https://github.com/PravGitHub/Stats_Project
